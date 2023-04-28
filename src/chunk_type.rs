@@ -3,7 +3,7 @@ use std::str;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
-struct ChunkType {
+pub struct ChunkType {
     bytes: [u8; 4],
 }
 
