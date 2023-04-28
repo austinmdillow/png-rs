@@ -1,11 +1,11 @@
 
 use crate::chunk_type::ChunkType;
-use crate::Error;
+
 use std::fmt;
-use std::str::FromStr;
+use crc;
 
 #[derive(Debug, PartialEq)]
-struct Chunk {
+pub struct Chunk {
     length: u32,
     chunk_type: ChunkType,
     data: Vec<u8>,
@@ -13,31 +13,37 @@ struct Chunk {
 }
 
 impl Chunk {
-    fn new(chunk_type: ChunkType, data: Vec<u8>) -> Chunk {
-        return Chunk { length: data.len() as u32, chunk_type: chunk_type, data: data, crc: 0 };
+    pub fn new(chunk_type: ChunkType, data: Vec<u8>) -> Chunk {
+
+        let crc_data = [&chunk_type.bytes(), data.as_slice()].concat();
+        let crc = crc::crc32::checksum_ieee(&crc_data);
+        return Chunk { length: data.len() as u32, chunk_type: chunk_type, data: data, crc: crc };
     }
 
-    fn length(&self) -> u32 {
+    pub fn length(&self) -> u32 {
         return self.data.len() as u32;
     }
 
-    fn chunk_type(&self) -> &ChunkType {
+    pub fn chunk_type(&self) -> &ChunkType {
         return &self.chunk_type;
     }
 
-    fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         return &self.data;
     }
 
-    fn crc(&self) -> u32 {
-        10
+    pub fn crc(&self) -> u32 {
+        self.crc
+
     }
 
-    fn data_as_string(&self) -> Result<String, String> {
-        Ok("haha".to_string())
+    pub fn data_as_string(&self) -> Result<String, std::str::Utf8Error> {
+        let str_rep = std::str::from_utf8(&self.data)?;
+        return Ok("tostring".to_string());
+        //Ok(str_rep.to_string());
     }
 
-    fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         todo!()
     }
 
@@ -49,18 +55,34 @@ impl TryFrom<&[u8]> for Chunk {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
 
-        let chunk_type = ChunkType::from_str("Ruse").unwrap();
-
         let length_array: [u8;4] = value[0..4].try_into().expect("Can't read length byte array");
         let length = u32::from_be_bytes(length_array);
 
         let type_array: [u8;4] = value[4..8].try_into().expect("Can't read length byte array");
-
-
         let chunk_type = ChunkType::try_from(type_array).unwrap();
+
+        println!("Chunk type is {chunk_type} . validity {}", chunk_type.is_valid());
+
+        let mut data_vec = Vec::new();
+
+        for i in 8..value.len() {
+            data_vec.push(value[i]);
+        }
+        if data_vec.len() != length as usize {
+            return Err("Expected encoded length to equal input length");
+        }
         
-        let mut new_chunk = Chunk::new(chunk_type, Vec::from(&value[8..]));
-        new_chunk.length = length;
+        let crc_start_idx = length as usize + 8usize;
+        let encoded_crc_array:[u8;4] = value[crc_start_idx..crc_start_idx+4].try_into().expect("Can't read crc byte array");
+        let encoded_crc = u32::from_be_bytes(encoded_crc_array);
+
+        
+        let mut new_chunk = Chunk::new(chunk_type, data_vec);
+
+        if new_chunk.crc != encoded_crc {
+            return Err("Crcs do not match");
+        }
+        println!("Chunk len {length}.length");
         
         Ok(new_chunk)
     }
@@ -68,8 +90,8 @@ impl TryFrom<&[u8]> for Chunk {
 
 impl fmt::Display for Chunk {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let output = "";
-        write!(f, "{}", output)
+        write!(f, " {} data_len:{}",self.chunk_type, self.data.len())
+
     }
 }
 

@@ -9,11 +9,11 @@ pub struct ChunkType {
 
 // check bit 4 of byte 1 ... critical
 impl ChunkType {
-    fn bytes(&self) -> [u8; 4] {
+    pub fn bytes(&self) -> [u8; 4] {
         self.bytes
     }
 
-    fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         if !self.is_reserved_bit_valid() {
             return false;
         }
@@ -80,7 +80,8 @@ impl FromStr for ChunkType {
 impl fmt::Display for ChunkType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let output = str::from_utf8(&self.bytes).unwrap();
-        write!(f, "{}", output)
+        println!("output is {}", output);
+        write!(f, "CTS {} CTE", output)
     }
 }
 
