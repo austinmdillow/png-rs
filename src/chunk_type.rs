@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::str;
 use std::str::FromStr;
 
@@ -77,11 +77,9 @@ impl FromStr for ChunkType {
     }
 }
 
-impl fmt::Display for ChunkType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let output = str::from_utf8(&self.bytes).unwrap();
-        println!("output is {}", output);
-        write!(f, "CTS {} CTE", output)
+impl Display for ChunkType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", String::from_utf8_lossy(&self.bytes))
     }
 }
 
@@ -175,7 +173,7 @@ mod tests {
     #[test]
     pub fn test_chunk_type_string() {
         let chunk = ChunkType::from_str("RuSt").unwrap();
-        println!("AS STR{}", &chunk.to_string());
+        println!("AS STR {}", &chunk.to_string());
         assert_eq!(&chunk.to_string(), "RuSt");
     }
 

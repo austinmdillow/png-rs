@@ -4,7 +4,7 @@ use crate::chunk::Chunk;
 use crate::chunk_type::ChunkType;
 
 use std::fmt;
-use std::fs;
+use std::io::BufRead;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
@@ -20,7 +20,7 @@ impl Png {
 
     /// Creates a `Png` from a list of chunks using the correct header
     pub fn from_chunks(chunks: Vec<Chunk>) -> Self {
-        todo!()
+        Png { chunks: chunks }
     }
 
     /// Creates a `Png` from a file path
@@ -30,13 +30,13 @@ impl Png {
 
     /// Appends a chunk to the end of this `Png` file's `Chunk` list.
     pub fn append_chunk(&mut self, chunk: Chunk) {
-        todo!()
+        self.chunks.push(chunk)
     }
 
     /// Searches for a `Chunk` with the specified `chunk_type` and removes the first
     /// matching `Chunk` from this `Png` list of chunks.
     pub fn remove_chunk(&mut self, chunk_type: &str) -> Result<Chunk, String> {
-        todo!()
+        self.chunks.iter().position(|chunk| chunk.chunk_type().to_string() == chunk_type).map(|index| self.chunks.remove(index)).ok_or_else(|| "non-existent chunk".into())
     }
 
     /// The header of this PNG.
@@ -46,47 +46,67 @@ impl Png {
 
     /// Lists the `Chunk`s stored in this `Png`
     pub fn chunks(&self) -> &[Chunk] {
+        println!("{}", self);
         return &self.chunks;
     }
 
     /// Searches for a `Chunk` with the specified `chunk_type` and returns the first
     /// matching `Chunk` from this `Png`.
     pub fn chunk_by_type(&self, chunk_type: &str) -> Option<&Chunk> {
-        todo!()
+        self.chunks.iter().find(|chunk| chunk.chunk_type().to_string() == chunk_type)
     }
 
     /// Returns this `Png` as a byte sequence.
     /// These bytes will contain the header followed by the bytes of all of the chunks.
     pub fn as_bytes(&self) -> Vec<u8> {
-        todo!()
+        let mut bytes_out = vec![];
+        bytes_out.extend_from_slice(&Self::STANDARD_HEADER);
+
+        for chunk in self.chunks.iter() {
+            let mut chunk_bytes = chunk.as_bytes();
+            bytes_out.append(&mut chunk_bytes);
+        }
+
+        return bytes_out;
     }
 }
 
 impl TryFrom<&[u8]> for Png {
-    type Error = &'static str; // how does this work?
+    type Error = String; // how does this work?
 
     fn try_from(bytes: &[u8]) -> Result<Png, Self::Error> {
-        let reading_chunks = true;
-        println!("Trying to read");
+        let mut reader = BufReader::new(bytes);
 
-        let mut current_index = 0;
+        let mut header_buf = [0;8];
 
-        while reading_chunks {
-            let next_chunk = Chunk::try_from(&bytes[current_index..]).unwrap();
-            println!("{next_chunk}");
-            
+        reader.read_exact(&mut header_buf).map_err(|_x| "Could not decode header")?;
 
-            current_index += next_chunk.length() as usize;
+        if header_buf != Self::STANDARD_HEADER {
+            return Err("Decoded header does not equal expected header".to_string());
         }
 
-        return Err("ok")
+        let mut decoded_chunks = vec![];
+
+        while !reader.fill_buf().unwrap().is_empty() {
+            decoded_chunks.push(Chunk::read_chunk(&mut reader)?);
+        }
+
+        Ok(Png { chunks: decoded_chunks })
     }
 }
 
 impl fmt::Display for Png {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        writeln!(f, "PNG sz:{} .. Chunks are", self.chunks.len())?;
+
+        for chunk in self.chunks.iter() {
+            writeln!(f, "{}", chunk)?;
+        }
+        write!(f, "End chunks")?;
+        Ok(())
     }
+
+    
 }
 
 
@@ -224,6 +244,7 @@ mod tests {
     #[test]
     fn test_remove_chunk() {
         let mut png = testing_png();
+        println!("{}", png);
         png.append_chunk(chunk_from_strings("TeSt", "Message").unwrap());
         png.remove_chunk("TeSt").unwrap();
         let chunk = png.chunk_by_type("TeSt");
